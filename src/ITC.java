@@ -20,6 +20,7 @@ public class ITC {
         File INPUT = new File (args[0]);
         File OUTPUT = new File (args[1]);
         Automaton automaton = readAutomaton(INPUT);
+        automaton = removerEstadosInacessiveis(automaton);
         automaton.print();
         
     }
@@ -88,6 +89,9 @@ public class ITC {
                 }
             }
             
+            //Adicionando a matrizDeTransicao
+            automaton.setMatrizDeTransicao();
+            
         } catch (IOException ex) {
             System.out.println("Erro ao abrir arquivo");
         } finally {
@@ -99,6 +103,41 @@ public class ITC {
         }
         return automaton;
     }
+    
+    public static Automaton removerEstadosInacessiveis(Automaton a){
+    	//Automaton a = aut;
+    	Grafo g = new Grafo (a);
+    	g.buscaProfundidade(g, a.getQ0());
+    	
+    	for (int i = 0; i < g.verticesVisitados.length; i++) {
+			if (g.verticesVisitados[i] == false && a.states.get(i).isQ0() == false && a.states.get(i).isqFinal() == false){
+				for (State s : a.states) {
+		            for (Transition t : s.getTransitions()) {
+		                if(t.getQ() == i) t.setQ(-1); //Coloca transicao pro "vazio"
+		            }
+		        }
+			}
+		}
+    	
+    	int i = 0;
+    	int j = i;
+    	while (i<g.verticesVisitados.length){
+    		if (g.verticesVisitados[i] == false && a.states.get(j).isQ0() == false && a.states.get(j).isqFinal() == false){
+    			a.states.remove(j);
+    			if(j<a.getQ0()) a.setQ0(a.getQ0() - 1);
+    			j--;
+    		}
+    		j++;
+    		i++;
+		}
+    	return a;
+    }
+    
+    public static Automaton removerEstadosInuteis(Automaton a){
+    	return null;
+    }
+    
+    
 }
 
 
@@ -109,6 +148,7 @@ class Automaton{
     private int s;
     private int q0;
     ArrayList<State> states = new ArrayList<>();
+    int [][] matrizDeTransicoes;
     
     public void add(State q){
         states.add(q);
@@ -142,6 +182,20 @@ class Automaton{
         this.q0 = q0;
     }
     
+    public void setMatrizDeTransicao(){
+    	matrizDeTransicoes = new int [getN()][getS()];
+
+		int i = 0;
+		for (State s : states) {
+			int j = 0;
+            for (Transition t : s.getTransitions()) {
+            	matrizDeTransicoes[i][j] = t.getQ();
+            	j++;
+            }
+            i++;
+        }
+    }
+    
     public void print(){
         System.out.println(n +  " " +  s + " " + q0);
         for (State s : states) {
@@ -156,6 +210,9 @@ class Automaton{
             System.out.println();
         }
     }
+    
+    
+    
 }
 
 //classe que define um estado
@@ -216,6 +273,59 @@ class Transition {
     public int getQ() {
         return q;
     }
+    
+    public void setQ(int q){
+    	this.q = q;
+    }
+}
+
+class Grafo{
+	int[][] matrizDeAdjacencia;
+	int numeroVertices;
+	boolean [] verticesVisitados;
+	ArrayList <Integer> percurso;
+	
+	public Grafo(Automaton a){
+		percurso = new ArrayList<Integer>();
+		
+		matrizDeAdjacencia = new int[a.getN()][a.getN()];
+		
+		//Inicializa todas as posicoes do grafo com -1
+		for (int i = 0; i < matrizDeAdjacencia.length; i++) {
+			for (int j = 0; j < matrizDeAdjacencia[i].length; j++) {
+				matrizDeAdjacencia[i][j] = -1;
+			}
+		}
+		
+		for (int i = 0; i < a.matrizDeTransicoes.length; i++) {
+			for (int j = 0; j < a.matrizDeTransicoes[0].length; j++) {
+				if(a.matrizDeTransicoes[i][j] != -1){
+					matrizDeAdjacencia[i][a.matrizDeTransicoes[i][j]] = j;
+				}
+			}
+		}
+		
+		numeroVertices = a.getN();
+		verticesVisitados = new boolean [numeroVertices];
+		
+		for (int i = 0; i < matrizDeAdjacencia.length; i++) {
+			verticesVisitados[i] = false;
+		}
+	}
+	
+	
+	public void buscaProfundidade(Grafo grafo, int inicio) {    
+	    
+	    percurso.add(inicio);    
+	    
+	    verticesVisitados[inicio] = true;
+	    for (int i = 0; i < grafo.numeroVertices; i++) {    
+	        if (grafo.matrizDeAdjacencia[inicio][i] != -1 && verticesVisitados[i] == false) {    
+	            buscaProfundidade(grafo, i);   
+	            percurso.add(inicio); //Testar  
+	        }    
+	    }    
+	}   
 }
 
 //pode ser util futuramente
