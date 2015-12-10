@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 
 /**
  *
@@ -21,6 +22,7 @@ public class ITC {
         File OUTPUT = new File (args[1]);
         Automaton automaton = readAutomaton(INPUT);
         automaton = removerEstadosInacessiveis(automaton);
+        automaton = removerEstadosInuteis(automaton);
         automaton.print();
         
     }
@@ -124,6 +126,7 @@ public class ITC {
     	while (i<g.verticesVisitados.length){
     		if (g.verticesVisitados[i] == false && a.states.get(j).isQ0() == false && a.states.get(j).isqFinal() == false){
     			a.states.remove(j);
+    			a.setN(a.getN() - 1);
     			if(j<a.getQ0()) a.setQ0(a.getQ0() - 1);
     			j--;
     		}
@@ -134,7 +137,63 @@ public class ITC {
     }
     
     public static Automaton removerEstadosInuteis(Automaton a){
-    	return null;
+    	ArrayList <State> estados = a.getStates();
+    	int estadoFinal = -1;
+    	//ArrayList <Integer> estadosQueSeraoRemovidos = new ArrayList<Integer>();
+    	boolean [] estadosQueSeraoRemovidos = new boolean [a.getN()];
+    	
+    	for (int j = 0; j < estadosQueSeraoRemovidos.length; j++) {
+			estadosQueSeraoRemovidos[j] = false;
+		}
+    	
+    	for (State es : estados){
+    		if(es.isqFinal() == true) estadoFinal = es.getQ();
+    	}
+    	
+    	for (State es : estados){
+    		if(es.isQ0() == false && es.isqFinal() == false){
+    	    	Grafo g = new Grafo (a);
+    			g.buscaProfundidade(g, es.getQ());
+
+    			for (int i = 0; i < g.verticesVisitados.length; i++) {
+					if(g.verticesVisitados[i] == false && i == estadoFinal) estadosQueSeraoRemovidos[es.getQ()] = true;
+				}
+    		}
+    	}
+    	
+    	//remove os estados
+    	for (int i = 0; i < estadosQueSeraoRemovidos.length; i++) {
+			if (estadosQueSeraoRemovidos[i] == true){
+				for (State s : a.states) {
+		            for (Transition t : s.getTransitions()) {
+		                if(t.getQ() == i) t.setQ(-1); //Coloca transicao pro "vazio"
+		            }
+		        }
+			}
+		}
+    	
+    	int i = 0;
+    	int j = i;
+    	while (i<estadosQueSeraoRemovidos.length){
+    		if (estadosQueSeraoRemovidos[i] == true){
+    			a.states.remove(j);
+    			a.setN(a.getN() - 1);
+    			if(j < a.getQ0()) a.setQ0(a.getQ0() - 1);
+    			j--;
+    		}
+    		j++;
+    		i++;
+		}
+    	
+    	return a;
+    }
+    
+    public Automaton removerEstadosEquivalentes(Automaton a){
+    	
+    	
+    	
+    	
+    	return a;
     }
     
     
@@ -243,6 +302,10 @@ class State {
     
     public void set0(){
         this.q0 = true;
+    }
+    
+    public int getQ(){
+    	return q;
     }
     
     public void addTransition(int a, int q){
