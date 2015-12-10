@@ -23,6 +23,7 @@ public class ITC {
         Automaton automaton = readAutomaton(INPUT);
         automaton = removerEstadosInacessiveis(automaton);
         automaton = removerEstadosInuteis(automaton);
+        automaton = removerEstadosEquivalentes(automaton);
         automaton.print();
         
     }
@@ -133,6 +134,7 @@ public class ITC {
     		j++;
     		i++;
 		}
+    	a.setMatrizDeTransicao();
     	return a;
     }
     
@@ -184,16 +186,161 @@ public class ITC {
     		j++;
     		i++;
 		}
-    	
+    	a.setMatrizDeTransicao();
     	return a;
     }
     
-    public Automaton removerEstadosEquivalentes(Automaton a){
+    public static Automaton removerEstadosEquivalentes(Automaton a){
+    	int[][] matrizDeSemelhantes = new int [a.getN()][a.getN()];  	
+    	ArrayList <State> st = a.getStates();
+    	
+    	//Preenche ma triz inicialmente com zeros, e -1 na diagonal principal
+    	for (int i = 0; i < matrizDeSemelhantes.length; i++) {
+			for (int j = 0; j < matrizDeSemelhantes[0].length; j++) {
+				if(i==j)matrizDeSemelhantes[i][j] = -1;
+				else matrizDeSemelhantes[i][j] = 0;
+			}
+		}
+    	
+    	//1a etapa - Agrupar finais e nao finais    	
+    	for (int i = 0; i < st.size(); i++) {
+    			int j = i+1;
+    			if( j >= st.size()) break;
+				if(st.get(i).isqFinal() == true && st.get(j).isqFinal() == true) {
+					matrizDeSemelhantes[i][j] = 1;
+					matrizDeSemelhantes[j][i] = 1;
+				}
+				if(st.get(i).isqFinal() == false && st.get(j).isqFinal() == false) {
+					matrizDeSemelhantes[i][j] = 1;
+					matrizDeSemelhantes[j][i] = 1;
+				}
+		}
+    	
+    	//2a etapa - Marcacao dos estados que nao tenham transiçoes sobre os mesmos simbolos
+    	for (int i = 0; i < matrizDeSemelhantes.length; i++) {
+			for (int j = 0; j < matrizDeSemelhantes.length; j++) {
+				if (matrizDeSemelhantes [i][j] == 1){
+					ArrayList<Transition> ListaTransicoesEstado1 = st.get(i).transitions;
+					ArrayList<Transition> ListaTransicoesEstado2 = st.get(j).transitions;
+					ArrayList<Integer> TransicoesEstado1 = new ArrayList<Integer>();
+					ArrayList<Integer> TransicoesEstado2 = new ArrayList<Integer>();
+					for (int k = 0; k < ListaTransicoesEstado1.size(); k++) {
+						TransicoesEstado1.add(ListaTransicoesEstado1.get(k).getA());
+					}
+					for (int k = 0; k < ListaTransicoesEstado2.size(); k++) {
+						TransicoesEstado2.add(ListaTransicoesEstado2.get(k).getA());
+					}
+					if(!(TransicoesEstado1.containsAll(TransicoesEstado2))) matrizDeSemelhantes[i][j] = 0;
+					
+				}
+			}
+		}
+    	
+    	//3a etapa - Marcação dos estados que possuam transições não equivalentes (não vao para o mesmo estado)
+    	for (int i = 0; i < matrizDeSemelhantes.length; i++) {
+			for (int j = 0; j < matrizDeSemelhantes.length; j++) {
+				if (matrizDeSemelhantes [i][j] == 1){
+					ArrayList<Transition> ListaTransicoesEstado1 = st.get(i).transitions;
+					ArrayList<Transition> ListaTransicoesEstado2 = st.get(j).transitions;
+					ArrayList<Integer> TransicoesEstado1 = new ArrayList<Integer>();
+					ArrayList<Integer> TransicoesEstado2 = new ArrayList<Integer>();
+					for (int k = 0; k < ListaTransicoesEstado1.size(); k++) {
+						TransicoesEstado1.add(ListaTransicoesEstado1.get(k).getQ());
+					}
+					for (int k = 0; k < ListaTransicoesEstado2.size(); k++) {
+						TransicoesEstado2.add(ListaTransicoesEstado2.get(k).getQ());
+					}
+					if(!(TransicoesEstado1.containsAll(TransicoesEstado2))) matrizDeSemelhantes[i][j] = 0;
+					
+				}
+			}
+		}
+    	
+    	
+    	for (int i = 0; i < matrizDeSemelhantes.length; i++) {
+			for (int j = 0; j < matrizDeSemelhantes.length; j++) {
+				System.out.print(matrizDeSemelhantes[i][j] + " ");
+			}
+			System.out.println();
+		}
     	
     	
     	
+    	//4a etapa
+    	int [] rep = new int [a.getN()];
+    	for (int i = 0; i < rep.length; i++) {
+			rep[i] = -1;
+		}
+    	int cont = 0;
     	
-    	return a;
+    	for (int i = 0; i < rep.length; i++) {
+			if (rep[i] == -1){
+				System.out.println("VALOR DO C: " + cont);
+				cont++;
+				rep [i] = cont-1;
+				for (int j = 0; j < matrizDeSemelhantes[i].length; j++) {
+					if (matrizDeSemelhantes[i][j] == 1) rep[j] = rep[i];
+				}
+			}
+		}
+    	
+    	
+    	//Finaliza as modificações do Automato (controi o Automato Minimo)
+    	Automaton newAutomaton = new Automaton();
+    	for (int i = 0; i < cont; i++) {
+            newAutomaton.add(new State(i));
+        }
+    	newAutomaton.getStates().get(rep[a.getQ0()]).set0(); //Estado Inicial
+    	
+    	for (State s : a.getStates()) {
+			if(s.isqFinal()){
+				newAutomaton.getStates().get(rep[a.getStates().indexOf(s)]).setFinal();
+			}
+		}
+    	
+        newAutomaton.setN(cont);
+        newAutomaton.setS(a.getS());
+        newAutomaton.setQ0(rep[a.getQ0()]);
+        
+        int[][] matrizDeTransicaoOriginal = a.getMatrizDeTransicao();
+        int[][] novaMatrizDeTransicao = new int [newAutomaton.getN()][newAutomaton.getS()];
+    	
+        //Popula a nova matriz inicalmente com -1
+        for (int i = 0; i < novaMatrizDeTransicao.length; i++) {
+			for (int j = 0; j < novaMatrizDeTransicao[0].length; j++) {
+				novaMatrizDeTransicao[i][j] = -1;
+			}
+		}
+        
+        //Popula a nova matriz baseando-se nas equivalencias de estados
+        for (int i = 0; i < novaMatrizDeTransicao.length; i++) {
+			for (int j = 0; j < novaMatrizDeTransicao[0].length; j++) {
+				if(matrizDeTransicaoOriginal[i][j] != -1){
+					novaMatrizDeTransicao[ rep[i] ] [j] = rep[matrizDeTransicaoOriginal[i][j]];
+				}
+			}
+		}
+        
+        //Adicionando as transações aos estados do novo automato
+        for (int i = 0; i < novaMatrizDeTransicao.length; i++) {
+            for (int j = 0; j < novaMatrizDeTransicao[i].length; j++) {
+                //if(automatonData[i][j] != -1){
+                    newAutomaton.getStates().get(i).addTransition(j, novaMatrizDeTransicao[i][j]);
+                //}
+            }
+        }
+    	
+    	
+    	/*for (int i = 0; i < matrizDeSemelhantes.length; i++) {
+			for (int j = 0; j < matrizDeSemelhantes.length; j++) {
+				System.out.print(matrizDeSemelhantes[i][j] + " ");
+			}
+			System.out.println();
+		}*/
+    	
+    	
+    	
+    	return newAutomaton;
     }
     
     
@@ -253,6 +400,10 @@ class Automaton{
             }
             i++;
         }
+    }
+    
+    public int [][] getMatrizDeTransicao(){
+    	return matrizDeTransicoes;
     }
     
     public void print(){
